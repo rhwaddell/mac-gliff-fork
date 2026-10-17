@@ -388,7 +388,7 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
         .icon_name("view-fullscreen-symbolic")
         .build();
     let stats_btn = gtk::ToggleButton::builder()
-        .icon_name("utilities-system-monitor-symbolic")
+        .icon_name("dialog-information-symbolic")
         .tooltip_text("Show stats")
         .build();
     let tabs = gtk::Box::builder().spacing(6).build();
@@ -623,7 +623,10 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
 }
 
 const CONNECT_ICON: &str = "go-next-symbolic";
-const STOP_ICON: &str = "media-playback-stop-symbolic";
+/// Only GTK's builtin icon set is guaranteed on macOS (no Adwaita icon
+/// theme ships with the app): pick from it or the button shows the
+/// broken-image placeholder. The close X covers both stop and forget.
+const STOP_ICON: &str = "window-close-symbolic";
 const FORGET_ICON: &str = "window-close-symbolic";
 
 /// Wire the address bar: the + expands it, Enter connects to what was
