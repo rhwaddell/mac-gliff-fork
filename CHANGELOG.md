@@ -1,6 +1,16 @@
 # Changelog
 
 Derived from [conventional commits](https://www.conventionalcommits.org).
+## v0.2.1 (2026-10-17)
+### Documentation
+- The release dmg is Developer ID signed and notarized ([755e355](https://github.com/teomurgi/mac-gliff/commit/755e35564a135bb1155e112e8dfb1932699f3ee4))
+- Lead the README with a live-session screenshot ([8f73b6f](https://github.com/teomurgi/mac-gliff/commit/8f73b6fdc2909cb2940ee617acf2a9e24c4712e7))
+- Point the README screenshot at .github/assets ([d0b346d](https://github.com/teomurgi/mac-gliff/commit/d0b346db0386dcc66d7789e292a28ab51025d059))
+- Swap in the dusk-cityscape desktop screenshot ([f51929e](https://github.com/teomurgi/mac-gliff/commit/f51929ec7534914c38a97a8c62b8e382ec5bd4a2))
+
+### Fixes
+- Map the U key ([f8332ea](https://github.com/teomurgi/mac-gliff/commit/f8332ead2adc0ca25c41456bd6c75ae86abd9c78))
+
 ## v0.2.0 (2026-10-17)
 ### Build
 - Sign and notarize the release dmg with a Developer ID ([a5e6c12](https://github.com/teomurgi/mac-gliff/commit/a5e6c12057e85e667b519febe9c817bb2e76b5e4))
