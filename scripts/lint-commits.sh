@@ -15,7 +15,7 @@ while IFS= read -r subject; do
         echo "not a conventional commit: $subject" >&2
         status=1
     fi
-done < <(git log --format=%s $range)
+done < <(git log --no-merges --format=%s $range)
 
 if [ "$status" -ne 0 ]; then
     echo 'Subjects must match: type(scope)!: description' >&2
