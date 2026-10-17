@@ -38,6 +38,7 @@ commit_parsers = [
     { message = "^refactor", group = "Refactoring" },
     { message = "^test", group = "Testing" },
     { message = "^chore\\(release\\)", skip = true },
-    { message = "^chore|^ci|^build|^revert", group = "Internal" },
+    { message = "^build", group = "Build" },
+    { message = "^chore|^ci|^revert", group = "Internal" },
     { message = ".*", group = "Other" },
 ]

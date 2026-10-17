@@ -2,6 +2,9 @@
 
 Derived from [conventional commits](https://www.conventionalcommits.org).
 ## v0.2.0 (2026-10-17)
+### Build
+- Sign and notarize the release dmg with a Developer ID ([a5e6c12](https://github.com/teomurgi/mac-gliff/commit/a5e6c12057e85e667b519febe9c817bb2e76b5e4))
+
 ### Documentation
 - The DMG stays unsigned while waiting on the Apple developer subscription ([a3cbe41](https://github.com/teomurgi/mac-gliff/commit/a3cbe411aabe15f19aee86e8f12315bf12021243))
 - Refresh signing status and upstream credits ([e8740ac](https://github.com/teomurgi/mac-gliff/commit/e8740acd153dd45e1fc018c36c5d8c3c2b85b418))
@@ -9,9 +12,6 @@ Derived from [conventional commits](https://www.conventionalcommits.org).
 ### Features
 - Ship keymaps for every Apple keyboard layout with an xkb counterpart ([25fe9cb](https://github.com/teomurgi/mac-gliff/commit/25fe9cbc1557abe4c4e8318f64ee79686433bee2))
 - Ship the bundle as Gliff.app ([efc321e](https://github.com/teomurgi/mac-gliff/commit/efc321e071dbbc673642b55d13d331e6ea671301))
-
-### Internal
-- Sign and notarize the release dmg with a Developer ID ([a5e6c12](https://github.com/teomurgi/mac-gliff/commit/a5e6c12057e85e667b519febe9c817bb2e76b5e4))
 
 ## v0.1.1 (2026-10-11)
 ### Fixes

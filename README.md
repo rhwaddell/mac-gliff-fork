@@ -94,9 +94,8 @@ macos/build-dmg.sh          # -> dist/gliff-<version>-<arch>.dmg
 
 CI builds the same DMG on every push — grab it from the
 [Actions artifacts](https://github.com/teomurgi/mac-gliff/actions/workflows/ci.yml).
-The build waits on Apple to enable the developer subscription, so the DMG
-is unsigned for now (ad-hoc signature only) and Gatekeeper asks on the
-first launch of a downloaded copy — expected to change shortly. No Homebrew formula yet.
+The DMG is Developer ID signed, notarized and stapled — downloaders get a
+clean first launch, no Gatekeeper prompts. No Homebrew formula yet.
 
 On the Hyprland machine, install `gliff-server` from upstream — `omarchy pkg add gliff`
 from the [Omarchy Package Repository](https://github.com/omacom/omarchy-pkgs), or build
@@ -138,7 +137,7 @@ verified from the mounted image, GTK stack and all.
 
 - [x] DMG bundle with the app icon (`macos/build-dmg.sh`; CI publishes the artifact)
 - [ ] Homebrew packaging
-- [ ] Developer ID codesigning + notarization (the DMG is ad-hoc signed today)
+- [x] Developer ID codesigning + notarization (since v0.2.0)
 
 Known limits: script-specific and IME-style keyboard layouts fall back to `us`, and
 macOS-reserved chords — Spotlight's ⌘Space, ⌘Tab, Mission Control — stay on the Mac even while
