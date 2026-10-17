@@ -572,6 +572,14 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
         );
     }
 
+    // Right-click in the header otherwise opens GtkWindowHandle's fallback
+    // window menu (Restore/Minimize/Maximize/Close) and claims the
+    // sequence before a tab's own menu gesture can run; turning the
+    // titlebar action off leaves the tab menu the only right-click there.
+    if let Some(settings) = gtk::Settings::default() {
+        settings.set_gtk_titlebar_right_click(Some("none"));
+    }
+
     // Offer every local clipboard change to the servers; our own proxy for
     // a server's selection does not count as a change.
     {
