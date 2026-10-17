@@ -22,11 +22,21 @@ unsafe extern "C" {
 /// Hide the pointer until a matching [`unhide`]; nested hides nest.
 pub fn hide() {
     // SAFETY: +[NSCursor hide] takes no arguments and returns void.
-    unsafe { objc_msgSend(objc_getClass(c"NSCursor".as_ptr()), sel_registerName(c"hide".as_ptr())) }
+    unsafe {
+        objc_msgSend(
+            objc_getClass(c"NSCursor".as_ptr()),
+            sel_registerName(c"hide".as_ptr()),
+        )
+    }
 }
 
 /// Undo one [`hide`].
 pub fn unhide() {
     // SAFETY: +[NSCursor unhide] takes no arguments and returns void.
-    unsafe { objc_msgSend(objc_getClass(c"NSCursor".as_ptr()), sel_registerName(c"unhide".as_ptr())) }
+    unsafe {
+        objc_msgSend(
+            objc_getClass(c"NSCursor".as_ptr()),
+            sel_registerName(c"unhide".as_ptr()),
+        )
+    }
 }

@@ -8,9 +8,9 @@
 mod clipboard;
 mod clipboard_ui;
 #[cfg(target_os = "macos")]
-mod glvideo;
-#[cfg(target_os = "macos")]
 mod cursor;
+#[cfg(target_os = "macos")]
+mod glvideo;
 #[cfg(target_os = "macos")]
 mod kbd;
 mod keymap;
