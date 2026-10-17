@@ -55,6 +55,9 @@ pub enum Status {
         view_width: u32,
         view_height: u32,
         fps_cap: u32,
+        /// The session mirrors a headless output: its frames carry the
+        /// remote cursor painted in, so the client hides its own pointer.
+        headless: bool,
     },
     Stats {
         fps: f32,
@@ -319,11 +322,15 @@ where
     // Between HelloAck and StreamConfig the server may send a Ping; answer
     // it before anything else (even GPU setup) so the server's round-trip
     // estimate is seeded ahead of the first frame ack.
+    let mut headless = false;
     let mut got_ack = false;
     let (mut width, mut height, mut chroma, mut scale_milli, pipeline, mut view, mut fps_cap) = loop {
         match reader.read_msg::<ServerMsg>().await? {
             ServerMsg::HelloAck {
-                version, features, ..
+                version,
+                features,
+                session,
+                ..
             } => {
                 if version != PROTOCOL_VERSION {
                     return Err(
@@ -331,6 +338,7 @@ where
                     );
                 }
                 tracing::debug!(?features, "server features");
+                headless = session.headless;
                 got_ack = true;
             }
             ServerMsg::Ping { t } => writer.write_msg(&ClientMsg::Pong { t }).await?,
@@ -371,6 +379,7 @@ where
         view_width: view.0,
         view_height: view.1,
         fps_cap,
+        headless,
     });
     let decode_on = match (&decoder, &gpu) {
         #[cfg(target_os = "macos")]
@@ -701,6 +710,7 @@ where
                     view_width,
                     view_height,
                     fps_cap,
+                    headless,
                 });
             }
             ServerMsg::CursorShape {

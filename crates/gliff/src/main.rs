@@ -8,6 +8,8 @@
 mod clipboard;
 mod clipboard_ui;
 #[cfg(target_os = "macos")]
+mod cursor;
+#[cfg(target_os = "macos")]
 mod glvideo;
 #[cfg(target_os = "macos")]
 mod kbd;
@@ -29,12 +31,13 @@ use clap::Parser;
 use gliff_proto::{Axis, ClientMsg};
 use gliff_transport::SshTarget;
 use gtk::gdk;
+use gtk::gio;
 use gtk::glib;
 use gtk4 as gtk;
 use libadwaita as adw;
 use net::Frame;
 use net::{Endpoint, Picture, Status, Worker};
-use recent::Config;
+use recent::{Config, DisplayMode, DisplaySetting};
 use tokio::sync::mpsc::{unbounded_channel, UnboundedSender};
 
 /// A message plus optional trailing payload, sent from the UI to the worker.
@@ -152,6 +155,13 @@ struct App {
     /// keyboard stays local until the pointer leaves, or the picture is
     /// clicked.
     released: Cell<bool>,
+    /// The pointer is over the video widget, per the motion controller's
+    /// enter/leave; a headless session hides the local pointer for exactly
+    /// this span.
+    pointer_over_video: Cell<bool>,
+    /// The `NSCursor` hide/unhide balance, so a transition never hides
+    /// twice or unhides the user's own hide.
+    cursor_hidden: Cell<bool>,
     config_path: PathBuf,
     cli: Cli,
     keymap: keymap::Keymap,
@@ -185,6 +195,9 @@ struct Session {
     /// The server is streaming: set by its Connected status, cleared when
     /// the connection drops.
     connected: Cell<bool>,
+    /// The session's output is a private headless one, whose frames carry
+    /// the remote cursor painted in; set by its Connected status.
+    headless: Cell<bool>,
     /// Size of the stream the server is sending, from the last decoded frame.
     stream_size: Cell<(u32, u32)>,
     /// The full-quality fit size the stream is drawn into; equals the stream
@@ -220,6 +233,7 @@ impl Session {
             retries: Cell::new(0),
             gave_up: Cell::new(false),
             remembered: Cell::new(false),
+            headless: Cell::new(false),
             connected: Cell::new(false),
             stream_size: Cell::new((0, 0)),
             stream_view: Cell::new((0, 0)),
@@ -276,6 +290,18 @@ fn ssh_endpoint(cli: &Cli, host: &str) -> Endpoint {
         (Some(name), _) => vec!["--output".into(), name.clone()],
         (None, true) => vec!["--headless".into()],
         (None, false) => vec!["--output".into(), "auto".into()],
+    };
+    Endpoint::Ssh(t)
+}
+
+/// A machine's endpoint under an explicit screen mapping: mirroring its
+/// focused screen, or a private headless output that follows this window.
+fn ssh_endpoint_with_mode(cli: &Cli, host: &str, mode: DisplayMode) -> Endpoint {
+    let mut t = SshTarget::new(host.to_string());
+    t.server_bin = cli.server_bin.clone();
+    t.server_args = match mode {
+        DisplayMode::Mirror => vec!["--output".into(), "auto".into()],
+        DisplayMode::Window => vec!["--headless".into()],
     };
     Endpoint::Ssh(t)
 }
@@ -362,7 +388,7 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
         .icon_name("view-fullscreen-symbolic")
         .build();
     let stats_btn = gtk::ToggleButton::builder()
-        .icon_name("utilities-system-monitor-symbolic")
+        .icon_name("dialog-information-symbolic")
         .tooltip_text("Show stats")
         .build();
     let tabs = gtk::Box::builder().spacing(6).build();
@@ -480,6 +506,8 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
         view_size: Cell::new((0, 0)),
         pressed_keys: RefCell::new(BTreeSet::new()),
         released: Cell::new(false),
+        pointer_over_video: Cell::new(false),
+        cursor_hidden: Cell::new(false),
         config_path: Config::default_path(),
         cli: cli.clone(),
         keymap: keymap::watch(),
@@ -544,6 +572,14 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
         );
     }
 
+    // Right-click in the header otherwise opens GtkWindowHandle's fallback
+    // window menu (Restore/Minimize/Maximize/Close) and claims the
+    // sequence before a tab's own menu gesture can run; turning the
+    // titlebar action off leaves the tab menu the only right-click there.
+    if let Some(settings) = gtk::Settings::default() {
+        settings.set_gtk_titlebar_right_click(Some("none"));
+    }
+
     // Offer every local clipboard change to the servers; our own proxy for
     // a server's selection does not count as a change.
     {
@@ -562,13 +598,23 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
     // closed, then any named on the command line, which is shown first.
     let config = Config::load(&ui.config_path);
     let from_cli = endpoints_from_cli(cli);
-    for machine in &config.open {
-        open_session(&ui, ssh_endpoint(cli, machine));
+    // Command-line endpoints open first: an explicit --headless or
+    // --output beats the machine's remembered display mode, which the
+    // remembered loop below would otherwise win by opening first.
+    for endpoint in &from_cli {
+        open_session(&ui, endpoint.clone());
     }
-    for endpoint in from_cli.iter().cloned() {
-        if find_session(&ui, machine_name(&endpoint)).is_none() {
-            open_session(&ui, endpoint);
+    for machine in &config.open {
+        if find_session(&ui, machine).is_some() {
+            continue;
         }
+        // The machine's last choice, remembered or not; there is no click
+        // to ask at.
+        let endpoint = match config.display_setting(machine).map(|s| s.mode) {
+            Some(mode) => ssh_endpoint_with_mode(cli, machine, mode),
+            None => ssh_endpoint(cli, machine),
+        };
+        open_session(&ui, endpoint);
     }
     // The address bar showed for the empty tabs; with sessions open it
     // folds into the +.
@@ -589,7 +635,10 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
 }
 
 const CONNECT_ICON: &str = "go-next-symbolic";
-const STOP_ICON: &str = "media-playback-stop-symbolic";
+/// Only GTK's builtin icon set is guaranteed on macOS (no Adwaita icon
+/// theme ships with the app): pick from it or the button shows the
+/// broken-image placeholder. The close X covers both stop and forget.
+const STOP_ICON: &str = "window-close-symbolic";
 const FORGET_ICON: &str = "window-close-symbolic";
 
 /// Wire the address bar: the + expands it, Enter connects to what was
@@ -668,12 +717,125 @@ fn connect_from_address_bar(ui: &Rc<App>) {
     ui.entry.set_text("");
     match find_session(ui, &machine) {
         Some(s) => show_session(ui, &s),
-        None => open_session(ui, ssh_endpoint(&ui.cli, &machine)),
+        None => connect_ssh(ui, &machine),
     }
     show_address_bar(ui, false);
     if active(ui).is_some() {
         ui.video.grab_focus();
     }
+}
+
+/// Connect to `machine` over ssh. The command line's own `--headless` or
+/// `--output` fixes the mapping outright; a remembered choice is used
+/// without asking; anything else asks first and connects once answered.
+fn connect_ssh(ui: &Rc<App>, machine: &str) {
+    if ui.cli.headless || ui.cli.output.is_some() {
+        open_session(ui, ssh_endpoint(&ui.cli, machine));
+        return;
+    }
+    let remembered = Config::load(&ui.config_path)
+        .display_setting(machine)
+        .filter(|s| s.remember);
+    match remembered {
+        Some(setting) => open_session(ui, ssh_endpoint_with_mode(&ui.cli, machine, setting.mode)),
+        None => ask_display_mode(ui, machine),
+    }
+}
+
+/// The connect dialog: how the remote screen should appear here, and
+/// whether to remember the choice for this machine. Connect opens the
+/// session under it.
+fn ask_display_mode(ui: &Rc<App>, machine: &str) {
+    let stored = Config::load(&ui.config_path).display_setting(machine);
+    let preselect = stored.map_or(DisplayMode::Mirror, |s| s.mode);
+
+    let (mirror, mirror_row) = choice_row(
+        "Mirror the remote screen",
+        "Show the remote's own display, at its own resolution.",
+    );
+    let (window, window_row) = choice_row(
+        "Fit the remote screen to this window",
+        "A private remote screen that resizes with this window.",
+    );
+    window.set_group(Some(&mirror));
+    match preselect {
+        DisplayMode::Mirror => mirror.set_active(true),
+        DisplayMode::Window => window.set_active(true),
+    }
+    let remember = gtk::CheckButton::with_label("Remember this choice for this machine");
+    remember.set_active(stored.is_some_and(|s| s.remember));
+    let choices = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(12)
+        .margin_top(6)
+        .build();
+    choices.append(&mirror_row);
+    choices.append(&window_row);
+    choices.append(&remember);
+
+    let dialog = adw::AlertDialog::new(
+        Some(&format!("Connect to {machine}")),
+        Some("How should the remote screen appear?"),
+    );
+    dialog.set_extra_child(Some(&choices));
+    dialog.add_response("cancel", "Cancel");
+    dialog.add_response("connect", "Connect");
+    dialog.set_response_appearance("connect", adw::ResponseAppearance::Suggested);
+    dialog.set_default_response(Some("connect"));
+    dialog.set_close_response("cancel");
+    {
+        let ui = ui.clone();
+        let machine = machine.to_string();
+        dialog.connect_response(None, move |_, response| {
+            if response != "connect" {
+                return;
+            }
+            let mode = if window.is_active() {
+                DisplayMode::Window
+            } else {
+                DisplayMode::Mirror
+            };
+            let mut config = Config::load(&ui.config_path);
+            config.set_display_setting(
+                &machine,
+                DisplaySetting {
+                    mode,
+                    remember: remember.is_active(),
+                },
+            );
+            save_config(&ui, &config);
+            open_session(&ui, ssh_endpoint_with_mode(&ui.cli, &machine, mode));
+        });
+    }
+    dialog.present(Some(&ui.window));
+}
+
+/// One radio row of the connect dialog: the choice and a dim caption.
+fn choice_row(title: &str, caption: &str) -> (gtk::CheckButton, gtk::Box) {
+    let check = gtk::CheckButton::builder()
+        .valign(gtk::Align::Start)
+        .build();
+    let title = gtk::Label::builder()
+        .label(title)
+        .halign(gtk::Align::Start)
+        .build();
+    let caption = gtk::Label::builder()
+        .label(caption)
+        .halign(gtk::Align::Start)
+        .xalign(0.0)
+        .wrap(true)
+        .css_classes(["dim-label"])
+        .build();
+    let text = gtk::Box::builder()
+        .orientation(gtk::Orientation::Vertical)
+        .spacing(2)
+        .build();
+    text.append(&title);
+    text.append(&caption);
+    let row = gtk::Box::builder().spacing(8).build();
+    row.append(&check);
+    row.append(&text);
+    (check, row)
 }
 
 /// Give up the edit: empty the address bar, fold it back into the +, and
@@ -878,7 +1040,145 @@ fn machine_tab(ui: &Rc<App>, name: &str) -> gtk::Box {
         });
     }
     tab.add_controller(drop);
+
+    // Right-click offers the machine's screen mapping; dev TCP sessions
+    // have none, and a machine with no session is an ssh one by
+    // construction.
+    if session
+        .as_ref()
+        .is_none_or(|s| matches!(s.endpoint, Endpoint::Ssh(_)))
+    {
+        install_tab_menu(ui, &tab, name);
+    }
     tab
+}
+
+/// Record `mode` for `machine` and make it true now: a running ssh
+/// session reconnects under it — the server is spawned with the mode's
+/// argument — and a stopped machine takes it on the next connect.
+fn set_display_mode(ui: &Rc<App>, name: &str, mode: DisplayMode) {
+    let mut config = Config::load(&ui.config_path);
+    let remember = config.display_setting(name).is_some_and(|s| s.remember);
+    config.set_display_setting(name, DisplaySetting { mode, remember });
+    save_config(ui, &config);
+    // A session whose server already runs this mode needs no restart.
+    let restart = find_session(ui, name)
+        .as_ref()
+        .and_then(|s| session_mode(s))
+        .is_some_and(|current| current != mode);
+    if restart {
+        stop_session(ui, name);
+        open_session(ui, ssh_endpoint_with_mode(&ui.cli, name, mode));
+    } else {
+        refresh_tabs(ui);
+    }
+}
+
+/// The screen mapping a session's server was spawned under; a dev TCP
+/// session has none.
+fn session_mode(s: &Session) -> Option<DisplayMode> {
+    match &s.endpoint {
+        Endpoint::Ssh(t) if t.server_args.iter().any(|a| a == "--headless") => {
+            Some(DisplayMode::Window)
+        }
+        Endpoint::Ssh(_) => Some(DisplayMode::Mirror),
+        Endpoint::Tcp(_) => None,
+    }
+}
+
+/// The tab's right-click menu: the machine's screen mapping, and whether
+/// to ask for it on every connect instead of using the remembered choice.
+fn install_tab_menu(ui: &Rc<App>, tab: &gtk::Box, name: &str) {
+    let stored = Config::load(&ui.config_path).display_setting(name);
+    let mode = stored.map_or(DisplayMode::Mirror, |s| s.mode);
+    let ask = stored.is_none_or(|s| !s.remember);
+
+    let mapping = gio::Menu::new();
+    for (label, m) in [
+        ("Mirror the remote screen", DisplayMode::Mirror),
+        ("Fit the remote screen to this window", DisplayMode::Window),
+    ] {
+        let item = gio::MenuItem::new(Some(label), None);
+        item.set_action_and_target_value(
+            Some("tab.display-mode"),
+            Some(&glib::Variant::from(mode_arg(m))),
+        );
+        mapping.append_item(&item);
+    }
+    let asking = gio::Menu::new();
+    let ask_item = gio::MenuItem::new(Some("Ask before connecting"), None);
+    ask_item.set_action_and_target_value(Some("tab.ask"), None);
+    asking.append_item(&ask_item);
+    let menu = gio::Menu::new();
+    menu.append_section(None, &mapping);
+    menu.append_section(None, &asking);
+
+    let mode_action = gio::SimpleAction::new_stateful(
+        "display-mode",
+        Some(glib::VariantTy::STRING),
+        &mode_arg(mode).to_variant(),
+    );
+    {
+        let ui = ui.clone();
+        let name = name.to_string();
+        mode_action.connect_activate(move |action, target| {
+            let mode = target.and_then(|v| v.str()).and_then(mode_from_arg);
+            if let Some(mode) = mode {
+                action.set_state(&mode_arg(mode).to_variant());
+                set_display_mode(&ui, &name, mode);
+            }
+        });
+    }
+    let ask_action = gio::SimpleAction::new_stateful("ask", None, &ask.to_variant());
+    {
+        let ui = ui.clone();
+        let name = name.to_string();
+        ask_action.connect_activate(move |action, _| {
+            let ask = !action.state().and_then(|v| v.get::<bool>()).unwrap_or(true);
+            action.set_state(&ask.to_variant());
+            let mode = Config::load(&ui.config_path)
+                .display_setting(&name)
+                .map_or(DisplayMode::Mirror, |s| s.mode);
+            let mut config = Config::load(&ui.config_path);
+            config.set_display_setting(
+                &name,
+                DisplaySetting {
+                    mode,
+                    remember: !ask,
+                },
+            );
+            save_config(&ui, &config);
+            refresh_tabs(&ui);
+        });
+    }
+    let actions = gio::SimpleActionGroup::new();
+    actions.add_action(&mode_action);
+    actions.add_action(&ask_action);
+    tab.insert_action_group("tab", Some(&actions));
+
+    let popover = gtk::PopoverMenu::from_model(Some(&menu));
+    popover.set_parent(tab);
+    let click = gtk::GestureClick::builder().button(3).build();
+    {
+        let popover = popover.clone();
+        click.connect_released(move |_, _, _, _| popover.popup());
+    }
+    tab.add_controller(click);
+}
+
+fn mode_arg(mode: DisplayMode) -> &'static str {
+    match mode {
+        DisplayMode::Mirror => "mirror",
+        DisplayMode::Window => "window",
+    }
+}
+
+fn mode_from_arg(s: &str) -> Option<DisplayMode> {
+    match s {
+        "mirror" => Some(DisplayMode::Mirror),
+        "window" => Some(DisplayMode::Window),
+        _ => None,
+    }
 }
 
 /// Show a machine's tab: switch to its running session, retrying one whose
@@ -893,7 +1193,7 @@ fn select_tab(ui: &Rc<App>, name: &str) {
             }
             show_session(ui, &s);
         }
-        None => open_session(ui, ssh_endpoint(&ui.cli, name)),
+        None => connect_ssh(ui, name),
     }
 }
 
@@ -936,6 +1236,8 @@ fn show_session(ui: &Rc<App>, s: &Rc<Session>) {
         }
     }
     ui.video.set_cursor(s.cursor.borrow().as_ref());
+    // Switching between a headless and a mirror session flips the hiding.
+    update_cursor_hidden(ui);
     // A background session kept the size the window had when it was last
     // shown.
     request_resize(ui);
@@ -954,6 +1256,7 @@ fn show_nothing(ui: &Rc<App>) {
     #[cfg(target_os = "macos")]
     ui.gl.clear();
     ui.video.set_cursor(None);
+    update_cursor_hidden(ui);
     refresh_tabs(ui);
 }
 
@@ -1070,12 +1373,16 @@ fn show_disconnected(ui: &Rc<App>, s: &Rc<Session>) {
     s.stream_view.set((0, 0));
     s.server_view.set((0, 0));
     s.cursor.borrow_mut().take();
+    // The frames carrying the painted-in cursor are gone; the local
+    // pointer shows again until the reconnect says headless once more.
+    s.headless.set(false);
     set_stats(ui, s, "");
     if is_active(ui, s) {
         ui.frame.clear();
         #[cfg(target_os = "macos")]
         ui.gl.clear();
         ui.video.set_cursor(None);
+        update_cursor_hidden(ui);
     }
 }
 
@@ -1254,7 +1561,9 @@ fn poll_status(ui: Rc<App>, s: Rc<Session>, rx: Receiver<Status>, generation: u6
                     view_width,
                     view_height,
                     fps_cap,
+                    headless,
                 } => {
+                    s.headless.set(headless);
                     s.server_view.set((view_width, view_height));
                     s.fps_cap.set(fps_cap);
                     s.resize_requested.set((0, 0));
@@ -1267,6 +1576,10 @@ fn poll_status(ui: Rc<App>, s: Rc<Session>, rx: Receiver<Status>, generation: u6
                     // Visible before the first per-second stats arrive.
                     set_stats(&ui, &s, &video);
                     remember_machine(&ui, &s);
+                    // A headless session paints the remote cursor into its
+                    // frames; hide the local pointer while it is over the
+                    // video, or every frame shows two cursors.
+                    update_cursor_hidden(&ui);
                     // A fresh server starts at its own default size; a
                     // reconnect must bring it back to the window. The gate
                     // compares against the view, so a server-chosen
@@ -1367,14 +1680,47 @@ fn poll_status(ui: Rc<App>, s: Rc<Session>, rx: Receiver<Status>, generation: u6
 /// compositor draws it at the real pointer position with no added latency.
 /// An image with no visible shape (fully transparent, or one flat colour as
 /// Hyprland sends when it has no cursor image to share) falls back to the
-/// default pointer so the user is never left without one.
+/// default pointer so the user is never left without one. Headless sessions
+/// ignore shapes: their frames carry the painted-in cursor and the local
+/// pointer is hidden while it is over the video (see
+/// [`update_cursor_hidden`]), so a widget cursor could only ever be a
+/// second pointer.
 fn set_remote_cursor(ui: &App, s: &Rc<Session>, image: CursorImage) {
+    if s.headless.get() {
+        return;
+    }
     let cursor = remote_cursor(image);
     if is_active(ui, s) {
         ui.video.set_cursor(cursor.as_ref());
     }
     *s.cursor.borrow_mut() = cursor;
 }
+
+/// Hide the local pointer while a headless session's frames already show
+/// the remote cursor, and show it again everywhere else. Hiding goes
+/// through `NSCursor` rather than a transparent widget cursor because
+/// macOS never applies the transparent one (and resets widget cursors to
+/// the arrow while a button is held); the painted-in pointer is then the
+/// only one on screen. Balanced through `cursor_hidden`, so a session or
+/// pointer-state change that resolves to the same state costs nothing.
+#[cfg(target_os = "macos")]
+fn update_cursor_hidden(ui: &App) {
+    let hide = ui.pointer_over_video.get() && active(ui).is_some_and(|s| s.headless.get());
+    if hide == ui.cursor_hidden.get() {
+        return;
+    }
+    ui.cursor_hidden.set(hide);
+    tracing::debug!(hide, "cursor hiding transition");
+    if hide {
+        cursor::hide();
+    } else {
+        cursor::unhide();
+    }
+}
+
+/// No headless sessions off the Mac; nothing to hide.
+#[cfg(not(target_os = "macos"))]
+fn update_cursor_hidden(_ui: &App) {}
 
 struct CursorImage<'a> {
     width: u32,
@@ -2000,6 +2346,8 @@ fn install_input_handlers(
         let ui = ui.clone();
         let video = video.clone();
         motion.connect_enter(move |_, _, _| {
+            ui.pointer_over_video.set(true);
+            update_cursor_hidden(&ui);
             if active(&ui).is_some()
                 && !ui.released.get()
                 && !address_bar_in_use(&ui.window, &ui.entry)
@@ -2012,6 +2360,8 @@ fn install_input_handlers(
         let ui = ui.clone();
         let window = window.clone();
         motion.connect_leave(move |_| {
+            ui.pointer_over_video.set(false);
+            update_cursor_hidden(&ui);
             // A deliberate release lasts only as long as the pointer rests on
             // the picture; leaving and coming back captures again.
             ui.released.set(false);
@@ -2330,6 +2680,33 @@ mod tests {
         assert!(!has_visible_shape(&transparent));
         assert!(!has_visible_shape(&black));
         assert!(has_visible_shape(&arrow));
+    }
+
+    #[test]
+    fn endpoints_carry_the_mode_and_report_back() {
+        let cli = Cli::parse_from(["mac-gliff"]);
+        let mirror = ssh_endpoint_with_mode(&cli, "user@host", DisplayMode::Mirror);
+        let window = ssh_endpoint_with_mode(&cli, "user@host", DisplayMode::Window);
+        let Endpoint::Ssh(m) = &mirror else {
+            panic!("not an ssh endpoint");
+        };
+        assert_eq!(m.server_args, vec!["--output", "auto"]);
+        let Endpoint::Ssh(w) = &window else {
+            panic!("not an ssh endpoint");
+        };
+        assert_eq!(w.server_args, vec!["--headless"]);
+        assert_eq!(
+            session_mode(&Session::new(mirror)),
+            Some(DisplayMode::Mirror)
+        );
+        assert_eq!(
+            session_mode(&Session::new(window)),
+            Some(DisplayMode::Window)
+        );
+        assert_eq!(
+            session_mode(&Session::new(Endpoint::Tcp("localhost:1".into()))),
+            None
+        );
     }
 
     #[test]

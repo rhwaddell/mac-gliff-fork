@@ -3,9 +3,28 @@
 //! offer them again as tabs. It also keeps which of them were connected and
 //! which was shown, so a reopened window connects to them again.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
+
+/// How a machine's remote screen maps onto the client's window.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum DisplayMode {
+    /// Mirror the remote's own screen at its own resolution.
+    Mirror,
+    /// A private headless remote output, resized to follow this window.
+    Window,
+}
+
+/// A machine's remembered screen-mapping choice.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DisplaySetting {
+    pub mode: DisplayMode,
+    /// Skip the connect-time choice and use `mode` again.
+    pub remember: bool,
+}
 
 #[derive(Debug, Default, Serialize, Deserialize, PartialEq)]
 pub struct Config {
@@ -17,6 +36,10 @@ pub struct Config {
     /// The machine the window showed last.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub shown: Option<String>,
+    /// Each machine's screen-mapping choice, asked for at connect; an
+    /// entry with `remember` set is used without asking again.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub display: BTreeMap<String, DisplaySetting>,
 }
 
 impl Config {
@@ -64,6 +87,8 @@ impl Config {
         // Only remembered machines can be reopened.
         let machines = config.machines.clone();
         config.open.retain(|m| machines.contains(m));
+        // A choice only outlives its machine while the machine does.
+        config.display.retain(|m, _| machines.contains(m));
         let mut seen = std::collections::HashSet::new();
         config.open.retain(|m| seen.insert(m.clone()));
         Ok(config)
@@ -82,6 +107,7 @@ impl Config {
     pub fn forget(&mut self, machine: &str) {
         self.machines.retain(|m| m != machine);
         self.set_open(machine, false);
+        self.display.remove(machine);
         if self.shown.as_deref() == Some(machine) {
             self.shown = None;
         }
@@ -111,6 +137,18 @@ impl Config {
         let to = self.machines.iter().position(|m| m == target).unwrap() + usize::from(after);
         self.machines.insert(to, moved);
         true
+    }
+
+    /// The machine's screen-mapping choice, if it has one.
+    pub fn display_setting(&self, machine: &str) -> Option<DisplaySetting> {
+        self.display.get(machine).copied()
+    }
+
+    /// Record the machine's screen-mapping choice. It is kept even before
+    /// the machine is remembered, so a first connect that never succeeds
+    /// loses the choice with the machine; `parse` drops such entries.
+    pub fn set_display_setting(&mut self, machine: &str, setting: DisplaySetting) {
+        self.display.insert(machine.to_string(), setting);
     }
 }
 
@@ -240,5 +278,55 @@ mod tests {
         std::fs::write(&path, "not toml [").unwrap();
         assert_eq!(Config::load(&path), Config::default());
         let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn display_setting_round_trips_through_toml() {
+        let mut c = Config::default();
+        c.remember("user@host");
+        c.set_display_setting(
+            "user@host",
+            DisplaySetting {
+                mode: DisplayMode::Window,
+                remember: true,
+            },
+        );
+        let text = toml::to_string(&c).unwrap();
+        assert_eq!(Config::parse(&text).unwrap(), c);
+        assert_eq!(
+            c.display_setting("user@host"),
+            Some(DisplaySetting {
+                mode: DisplayMode::Window,
+                remember: true,
+            })
+        );
+        assert_eq!(c.display_setting("other"), None);
+    }
+
+    #[test]
+    fn forget_and_parse_drop_the_display_setting() {
+        let mut c = Config::default();
+        c.remember("a");
+        c.set_display_setting(
+            "a",
+            DisplaySetting {
+                mode: DisplayMode::Mirror,
+                remember: true,
+            },
+        );
+        c.forget("a");
+        assert_eq!(c.display_setting("a"), None);
+
+        let mut c = Config::default();
+        c.remember("a");
+        c.set_display_setting(
+            "gone",
+            DisplaySetting {
+                mode: DisplayMode::Mirror,
+                remember: true,
+            },
+        );
+        let text = toml::to_string(&c).unwrap();
+        assert_eq!(Config::parse(&text).unwrap().display_setting("gone"), None);
     }
 }
