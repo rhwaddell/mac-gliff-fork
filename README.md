@@ -13,7 +13,7 @@ mac-gliff is a macOS port of **[gliff](https://github.com/omacom/gliff)** by Kev
 McConnell and DHH: the Linux client's VA-API + Vulkan GPU tier, rebuilt on **VideoToolbox +
 Metal**. The server is untouched — it stays on the Linux machine.
 
-<img src=".github/assets/screenshot.png" width="880" alt="mac-gliff streaming a Hyprland desktop over ssh — full-colour terminal text, adaptive quality">
+<img src=".github/assets/screenshot.jpg" width="880" alt="A Hyprland desktop streamed to the Mac by mac-gliff">
 </div>
 
 ## Why
