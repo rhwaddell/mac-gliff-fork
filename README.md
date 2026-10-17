@@ -115,6 +115,12 @@ While the pointer is over the picture, keys and window-manager shortcuts go to t
 machine; `Shift+Esc` hands them back (`--release-hotkey` changes or disables that). Copy
 on one machine, paste on the other.
 
+Connecting to a machine from a tab (or the address bar) first asks how its screen should
+appear: **Mirror the remote screen**, or **Fit the remote screen to this window** — a
+private headless remote screen that resizes as this window does. Tick *Remember this
+choice for this machine* to skip the question on future connects; right-click the tab to
+change it any time. The choice is kept per machine.
+
 The Mac's own shortcuts work while the keyboard is local — ⌘Q quits, ⌘W closes the
 shown tab, ⌘T/⌘N open the address bar for a new connection. Captured, those chords go
 to the remote machine like any other: release first (`Shift+Esc`) to use them locally.
