@@ -84,42 +84,26 @@ flowchart LR
 The protocol runs over `ssh -T host gliff-server --stdio` — no open ports, no accounts,
 no relay. Only coded H.264 crosses the network.
 
-## Requirements
+## Install
 
-| Side | Needs |
-|---|---|
-| **Your Mac** | [Rust](https://rustup.rs) via rustup (version pinned by `rust-toolchain.toml`) and the GTK 4 libraries: `brew install pkg-config gtk4 libadwaita` |
-| **Remote machine** | Linux with [Hyprland](https://hyprland.org) running, [gliff](https://github.com/omacom/gliff) installed, and ssh access from the Mac |
+Grab the latest `gliff-<version>-<arch>.dmg` from
+[GitHub Releases](https://github.com/teomurgi/mac-gliff/releases) — `arm64` for Apple
+Silicon, `x86_64` for Intel. Open it and drag **Gliff** into `/Applications`, then
+launch it like any other Mac app. The DMG is Developer ID signed, notarized and
+stapled — no Gatekeeper prompts — and bundles the whole GTK stack, so there is
+nothing else to install on the Mac.
 
-## Build
+The machine you connect to needs Linux with [Hyprland](https://hyprland.org) running,
+ssh access from the Mac, and `gliff-server`: install it with `omarchy pkg add gliff`
+from the [Omarchy Package Repository](https://github.com/omacom/omarchy-pkgs), or
+build it from source at the [upstream repo](https://github.com/omacom/gliff#install).
 
-```sh
-git clone https://github.com/teomurgi/mac-gliff && cd mac-gliff
-brew install pkg-config gtk4 libadwaita
-bin/build -p gliff                       # the client
-./target/release/mac-gliff user@host
-```
-
-### As a Mac app
-
-`macos/build-dmg.sh` bundles the client with the whole GTK stack inside
-`Gliff.app` (libraries relocated, nothing else to install) and wraps it in a
-DMG with an `/Applications` symlink:
-
-```sh
-macos/build-dmg.sh          # -> dist/gliff-<version>-<arch>.dmg
-```
-
-CI builds the same DMG on every push — grab it from the
-[Actions artifacts](https://github.com/teomurgi/mac-gliff/actions/workflows/ci.yml).
-The DMG is Developer ID signed, notarized and stapled — downloaders get a
-clean first launch, no Gatekeeper prompts. No Homebrew formula yet.
-
-On the Hyprland machine, install `gliff-server` from upstream — `omarchy pkg add gliff`
-from the [Omarchy Package Repository](https://github.com/omacom/omarchy-pkgs), or build
-it from source at the [upstream repo](https://github.com/omacom/gliff#install).
+Everything below [Use](#use) is for developers.
 
 ## Use
+
+From the installed app, hit ⌘T/⌘N and type `user@host` in the address bar. The
+commands below launch the client binary directly instead:
 
 ```sh
 mac-gliff user@host                  # mirror the remote screen that has focus
@@ -151,6 +135,35 @@ chord, `none` disables it). Or free ⌘Space itself — System Settings → Keyb
 Keyboard Shortcuts → Spotlight, off or remap "Show Spotlight search" — and it
 arrives like any other key.
 
+## Building from source
+
+For development, your Mac needs [Rust](https://rustup.rs) via rustup (version pinned by
+`rust-toolchain.toml`) and the GTK 4 libraries:
+
+```sh
+git clone https://github.com/teomurgi/mac-gliff && cd mac-gliff
+brew install pkg-config gtk4 libadwaita
+bin/build -p gliff                       # the client
+./target/release/mac-gliff user@host
+```
+
+### As a Mac app
+
+`macos/build-dmg.sh` bundles the client with the whole GTK stack inside `Gliff.app`
+(libraries relocated, nothing else to install) and wraps it in a DMG with an
+`/Applications` symlink:
+
+```sh
+macos/build-dmg.sh          # -> dist/gliff-<version>-<arch>.dmg
+```
+
+With `SIGNING_IDENTITY` set — a "Developer ID Application: …" identity plus notarytool
+credentials; see `macos/sign-notarize.sh` — the bundle and the DMG come out signed,
+notarized and stapled. Without one, the build is ad-hoc signed only, and Gatekeeper
+asks on the first launch of a downloaded copy. CI runs this script on every `v*` tag
+and publishes the DMG to [GitHub Releases](https://github.com/teomurgi/mac-gliff/releases)
+with git-cliff-generated notes.
+
 ## Status
 
 Ported and tested: decode + recombine (VideoToolbox + Metal, output checked against the
@@ -159,7 +172,7 @@ verified against the decoded pixels), keyboard input for the common layouts, and
 clipboard (verified live, both directions). The DMG bundle launches standalone —
 verified from the mounted image, GTK stack and all.
 
-- [x] DMG bundle with the app icon (`macos/build-dmg.sh`; CI publishes the artifact)
+- [x] DMG bundle with the app icon (`macos/build-dmg.sh`; CI publishes it to GitHub Releases)
 - [ ] Homebrew packaging
 - [x] Developer ID codesigning + notarization (since v0.2.0)
 
