@@ -1,74 +1,78 @@
 # Changelog
 
 Derived from [conventional commits](https://www.conventionalcommits.org).
+## v0.3.0 (2026-10-17)
+### Features
+- Ask how to map the remote screen; hide local pointer on headless (#2) ([f69497c](https://github.com/teomurgi/mac-gliff/commit/f69497c5e143d8b5a0e887948028d34f1afa9e28))
+
 ## v0.2.1 (2026-10-17)
 ### Documentation
-- The release dmg is Developer ID signed and notarized ([755e355](https://github.com/teomurgi/mac-gliff/commit/755e35564a135bb1155e112e8dfb1932699f3ee4))
-- Lead the README with a live-session screenshot ([8f73b6f](https://github.com/teomurgi/mac-gliff/commit/8f73b6fdc2909cb2940ee617acf2a9e24c4712e7))
-- Point the README screenshot at .github/assets ([d0b346d](https://github.com/teomurgi/mac-gliff/commit/d0b346db0386dcc66d7789e292a28ab51025d059))
-- Swap in the dusk-cityscape desktop screenshot ([f51929e](https://github.com/teomurgi/mac-gliff/commit/f51929ec7534914c38a97a8c62b8e382ec5bd4a2))
+- The release dmg is Developer ID signed and notarized ([24c5f86](https://github.com/teomurgi/mac-gliff/commit/24c5f868a04395223733d9bac19ad1353281bc6d))
+- Lead the README with a live-session screenshot ([d19a560](https://github.com/teomurgi/mac-gliff/commit/d19a5606a77676f72675e3278a81ea8ad13028c1))
+- Point the README screenshot at .github/assets ([da5f1a9](https://github.com/teomurgi/mac-gliff/commit/da5f1a9214a0d559203f955bfd2370b5e16633f1))
+- Swap in the dusk-cityscape desktop screenshot ([542da12](https://github.com/teomurgi/mac-gliff/commit/542da1205c655fb6d8d4e83a6edcb5b8a1ade8dc))
 
 ### Fixes
-- Map the U key ([f8332ea](https://github.com/teomurgi/mac-gliff/commit/f8332ead2adc0ca25c41456bd6c75ae86abd9c78))
+- Map the U key ([73ad3cf](https://github.com/teomurgi/mac-gliff/commit/73ad3cf48a94f3a541c0151fbb0af287d6cf4b8a))
 
 ## v0.2.0 (2026-10-17)
 ### Build
-- Sign and notarize the release dmg with a Developer ID ([a5e6c12](https://github.com/teomurgi/mac-gliff/commit/a5e6c12057e85e667b519febe9c817bb2e76b5e4))
+- Sign and notarize the release dmg with a Developer ID ([74e2037](https://github.com/teomurgi/mac-gliff/commit/74e20377964e6bcee53c622dde380ec3efada6e8))
 
 ### Documentation
-- The DMG stays unsigned while waiting on the Apple developer subscription ([a3cbe41](https://github.com/teomurgi/mac-gliff/commit/a3cbe411aabe15f19aee86e8f12315bf12021243))
-- Refresh signing status and upstream credits ([e8740ac](https://github.com/teomurgi/mac-gliff/commit/e8740acd153dd45e1fc018c36c5d8c3c2b85b418))
+- The DMG stays unsigned while waiting on the Apple developer subscription ([31ccf50](https://github.com/teomurgi/mac-gliff/commit/31ccf501e47dac490878776af55896b8f50b3f9a))
+- Refresh signing status and upstream credits ([066fdaa](https://github.com/teomurgi/mac-gliff/commit/066fdaafd1756c45e5cf13206796ba2cadc7e854))
 
 ### Features
-- Ship keymaps for every Apple keyboard layout with an xkb counterpart ([25fe9cb](https://github.com/teomurgi/mac-gliff/commit/25fe9cbc1557abe4c4e8318f64ee79686433bee2))
-- Ship the bundle as Gliff.app ([efc321e](https://github.com/teomurgi/mac-gliff/commit/efc321e071dbbc673642b55d13d331e6ea671301))
+- Ship keymaps for every Apple keyboard layout with an xkb counterpart ([e6fb2b2](https://github.com/teomurgi/mac-gliff/commit/e6fb2b222622630998f6388886b48217d8458407))
+- Ship the bundle as Gliff.app ([07a3a7e](https://github.com/teomurgi/mac-gliff/commit/07a3a7ec13d00dd665290e422edb1e0172dc2252))
 
 ## v0.1.1 (2026-10-11)
 ### Fixes
-- Resolve ssh helpers from the GUI launch PATH ([561c507](https://github.com/teomurgi/mac-gliff/commit/561c50790cb25894b2484445a768d04f4acbe1a4))
+- Resolve ssh helpers from the GUI launch PATH ([e59f9c6](https://github.com/teomurgi/mac-gliff/commit/e59f9c67b527a6c5655e8e2828dce5ed5984536e))
 
 ## v0.1.0 (2026-10-11)
 ### Documentation
-- README, contributing guide and license for the public launch ([11737c1](https://github.com/teomurgi/mac-gliff/commit/11737c1f646c4a7720dd7c105b7117230e73fdf7))
+- README, contributing guide and license for the public launch ([8ef5160](https://github.com/teomurgi/mac-gliff/commit/8ef51605f16efafb9f6e37443a300dad9f2208e1))
 
 ### Internal
-- Run the macOS tests under lldb for a backtrace ([ac4261e](https://github.com/teomurgi/mac-gliff/commit/ac4261ef7f59004373e11038aa7ae059c141b123))
-- Fix the lldb invocation (executable filter, process launch args) ([ae7b4ed](https://github.com/teomurgi/mac-gliff/commit/ae7b4edd641a7cccb4355ba52599eac56065cde7))
-- A C probe of FFmpeg's exact VT flow over the fixture ([0deb4e4](https://github.com/teomurgi/mac-gliff/commit/0deb4e4627778fbb314719f5634728ce217d7496))
-- Umbrella framework headers for the probe ([ba00893](https://github.com/teomurgi/mac-gliff/commit/ba00893401d1cdeb9a362ce77acbb14997344699))
-- Enforce conventional commits and automate changelog and releases ([50ca4eb](https://github.com/teomurgi/mac-gliff/commit/50ca4eb010c9f7261cc274b8f4b416c3420d615b))
-- Start public versioning at 0.1.0 ([6e47376](https://github.com/teomurgi/mac-gliff/commit/6e47376317d25ff1b808b4ce7216f459eceeb599))
+- Run the macOS tests under lldb for a backtrace ([313c0d2](https://github.com/teomurgi/mac-gliff/commit/313c0d270aabeb16c947c404712ebc9e87466b5e))
+- Fix the lldb invocation (executable filter, process launch args) ([12c95eb](https://github.com/teomurgi/mac-gliff/commit/12c95eb7a71fa66695b8d86d23d44a257d0eefc9))
+- A C probe of FFmpeg's exact VT flow over the fixture ([b420ef2](https://github.com/teomurgi/mac-gliff/commit/b420ef28d7df7d838fb9742f85e0b1a08f373742))
+- Umbrella framework headers for the probe ([86e1e8c](https://github.com/teomurgi/mac-gliff/commit/86e1e8c7a78f432bb26d80af4162bbc59b73b257))
+- Enforce conventional commits and automate changelog and releases ([faad3d2](https://github.com/teomurgi/mac-gliff/commit/faad3d2e6c62181af08719c41512e4d6c648af7e))
+- Start public versioning at 0.1.0 ([0f4bb42](https://github.com/teomurgi/mac-gliff/commit/0f4bb42379d99b12063034f87bf180ec15c9ac4e))
 
 ### Other
-- Vendor gliff 0.3.1 (omacom/gliff @ a2edd50) ([e919614](https://github.com/teomurgi/mac-gliff/commit/e919614f2705111066cdf178f87918719a963d35))
-- The macOS GPU tier — VideoToolbox decode + Metal recombine ([bd5ada9](https://github.com/teomurgi/mac-gliff/commit/bd5ada9eb4d6406b720e5a1e59c68e2ab8fc4ac9))
-- Do not link a Dispatch framework ([55aa8ab](https://github.com/teomurgi/mac-gliff/commit/55aa8ab8fbb574b399dcb6d3f5b188e12a70f6ba))
-- Release the semaphore with dispatch_release ([007ef5b](https://github.com/teomurgi/mac-gliff/commit/007ef5bcacaa33943bd5cb95604f0ecb3ae7625f))
-- Vt, compute: fixes from the first real macOS run ([a028178](https://github.com/teomurgi/mac-gliff/commit/a028178c6ba15bd482b9a8071aca9de55e284064))
-- Complete the CMBlockBufferCreateWithMemoryBlock signature ([3847116](https://github.com/teomurgi/mac-gliff/commit/3847116025d7cb671318b9d850c3768979332abd))
-- Logical-RGBA writes and grouped dispatch ([49cb07c](https://github.com/teomurgi/mac-gliff/commit/49cb07c198f0cf03a188383ed40d398a69a0e316))
-- Reference the caller's sample buffer, FFmpeg's flags ([72e7d57](https://github.com/teomurgi/mac-gliff/commit/72e7d5795532560a2ff65a34d82c2c6caf9c1f2f))
-- CMBlockBufferCreateWithMemoryBlock has no sourceBuffer ([9349b74](https://github.com/teomurgi/mac-gliff/commit/9349b74b68857501fbc38a7b6a2f7b59115bdf43))
-- Progress markers around the decode pipeline ([67abd35](https://github.com/teomurgi/mac-gliff/commit/67abd356c56202e2639b5391d6132c4e8441eef6))
-- A software-decode constructor for virtual machines ([5471f8a](https://github.com/teomurgi/mac-gliff/commit/5471f8a676d797ec788852c6943ac5f06ae5f43f))
-- VTDecompressionSessionDecodeFrame takes infoFlagsOut ([7b2a6e2](https://github.com/teomurgi/mac-gliff/commit/7b2a6e232289c215fbcb7ac7148764dbff161e17))
-- Clean up after the runner debugging ([87674b9](https://github.com/teomurgi/mac-gliff/commit/87674b9599eb50fb17d573f49e1c360537d320e6))
-- Add handoff notes for resuming on a real Mac ([aa4e3dc](https://github.com/teomurgi/mac-gliff/commit/aa4e3dc59fd9ac1ce10b82fce9e7fcb51e9babdd))
-- Wire the VideoToolbox+Metal tier into the client ([cd68d4f](https://github.com/teomurgi/mac-gliff/commit/cd68d4f6b8e8eed8fc81203ddace53d3a3984715))
-- IOSurface-backed recombine outputs ([49afa31](https://github.com/teomurgi/mac-gliff/commit/49afa31ad30fe90facaf54003bad0513bc2e7904))
-- Zero-copy display — the GLArea video widget ([e1f5a11](https://github.com/teomurgi/mac-gliff/commit/e1f5a1182560617276f3876fc25ded6228322615))
-- Input — the kVK→evdev table and shipped keymaps on macOS ([a65868b](https://github.com/teomurgi/mac-gliff/commit/a65868b1a7d144d83b602d39655f65756418d1e6))
-- Fix the macOS clipboard deadlock and the keymap send ([ee87173](https://github.com/teomurgi/mac-gliff/commit/ee87173a1db7fc6b767b99e2dcf3a2dd533e5ad4))
-- Ship the client as mac-gliff ([a0e36b9](https://github.com/teomurgi/mac-gliff/commit/a0e36b9b8b12640fa63453a918b24e6cc4a59502))
-- As_chunks for the constant-size chunk loops ([8b5c815](https://github.com/teomurgi/mac-gliff/commit/8b5c815d80be6119252e6e4d79f51183dbeb3bf6))
-- Keep the glvideo example compiling on Linux ([99e597d](https://github.com/teomurgi/mac-gliff/commit/99e597d43c58fe10f97707560e43cb54b86129af))
-- App icon and a DMG bundle ([ffc6284](https://github.com/teomurgi/mac-gliff/commit/ffc62841faa9b24bac1125e43778be2aaa20e465))
-- Fully relocate pixbuf loaders and bake bundle-relative cache ([3de42de](https://github.com/teomurgi/mac-gliff/commit/3de42de694c34d500f36539b0c5c10da4e55a6ca))
-- Gitignore macOS .DS_Store ([bcde31e](https://github.com/teomurgi/mac-gliff/commit/bcde31ec5afeadc372d0efb78752e2be1ceb6ccb))
-- Local ⌘ shortcuts and a launcher chord for the captured keyboard ([3c1435e](https://github.com/teomurgi/mac-gliff/commit/3c1435eaabd97176690a541be71bb889b6e8b228))
-- MacOS traffic-light window buttons ([fac918d](https://github.com/teomurgi/mac-gliff/commit/fac918d701e7c0714d8b56d77b0d9bc1065f3264))
-- Pin the Rust toolchain to 1.99.0 ([d3ba32d](https://github.com/teomurgi/mac-gliff/commit/d3ba32dd9d2d023871ae23a76546dc88791b63f8))
-- Make the workspace macOS-only ([6997961](https://github.com/teomurgi/mac-gliff/commit/699796123fc2783878880ada79a88625e944f3da))
-- Carry rustfmt and clippy in the pinned toolchain ([4fdce2d](https://github.com/teomurgi/mac-gliff/commit/4fdce2dda50550e4a13b19196bc5238af5737db5))
+- Vendor gliff 0.3.1 (omacom/gliff @ a2edd50) ([ba02503](https://github.com/teomurgi/mac-gliff/commit/ba025039f6a3330d1950ad72c97f874e5db95bf0))
+- The macOS GPU tier — VideoToolbox decode + Metal recombine ([6075c02](https://github.com/teomurgi/mac-gliff/commit/6075c02fa1f0ab7d1a56ace9a49ac370928a2da7))
+- Do not link a Dispatch framework ([510b753](https://github.com/teomurgi/mac-gliff/commit/510b75320a71a0812deb2161753a27906acd5848))
+- Release the semaphore with dispatch_release ([1eb2d4a](https://github.com/teomurgi/mac-gliff/commit/1eb2d4a258838fe7ae06e99e696873be748a810f))
+- Vt, compute: fixes from the first real macOS run ([ca4a4ed](https://github.com/teomurgi/mac-gliff/commit/ca4a4edc64a667073de30858b093ea09c2ed27b5))
+- Complete the CMBlockBufferCreateWithMemoryBlock signature ([bd5f824](https://github.com/teomurgi/mac-gliff/commit/bd5f824eb20b9ba9c2891db9d010ab6fb77748c1))
+- Logical-RGBA writes and grouped dispatch ([5567cc7](https://github.com/teomurgi/mac-gliff/commit/5567cc7f3b157f599819b087aedeea08b4fe5857))
+- Reference the caller's sample buffer, FFmpeg's flags ([0af8c23](https://github.com/teomurgi/mac-gliff/commit/0af8c2395311eac2b3563e4502b2b59403580214))
+- CMBlockBufferCreateWithMemoryBlock has no sourceBuffer ([9005986](https://github.com/teomurgi/mac-gliff/commit/90059863e9fd51fdf3708d375239815d8721849f))
+- Progress markers around the decode pipeline ([9a28714](https://github.com/teomurgi/mac-gliff/commit/9a28714c19cb2f98151681843f8e3c31bb20d644))
+- A software-decode constructor for virtual machines ([99a45c1](https://github.com/teomurgi/mac-gliff/commit/99a45c10d27c75c0e16c18dbb51b32db65b85475))
+- VTDecompressionSessionDecodeFrame takes infoFlagsOut ([cf82b7c](https://github.com/teomurgi/mac-gliff/commit/cf82b7c296bb03b90312797293f3e508562c96d2))
+- Clean up after the runner debugging ([e2edfb9](https://github.com/teomurgi/mac-gliff/commit/e2edfb9c5603c0384f06a5c13968858056c363a7))
+- Add handoff notes for resuming on a real Mac ([6160b73](https://github.com/teomurgi/mac-gliff/commit/6160b739f3f5ea83472a29435eea5a8b216510fa))
+- Wire the VideoToolbox+Metal tier into the client ([531d7f6](https://github.com/teomurgi/mac-gliff/commit/531d7f64f0e44f6d8b160d6bbf2c6b349402cb3b))
+- IOSurface-backed recombine outputs ([1a95b71](https://github.com/teomurgi/mac-gliff/commit/1a95b71b0dbf99f3cc76bf9e593cdce3260b5cab))
+- Zero-copy display — the GLArea video widget ([28e24ed](https://github.com/teomurgi/mac-gliff/commit/28e24ed44a20cfba97db518d0f96bde122a91a45))
+- Input — the kVK→evdev table and shipped keymaps on macOS ([543e266](https://github.com/teomurgi/mac-gliff/commit/543e2667b4d04f54b9928d9f6dac1e43806bdd27))
+- Fix the macOS clipboard deadlock and the keymap send ([438640f](https://github.com/teomurgi/mac-gliff/commit/438640fce9a7f10682c8ab8d5bc3747540c6d7c5))
+- Ship the client as mac-gliff ([f33bc13](https://github.com/teomurgi/mac-gliff/commit/f33bc1396b7f188e38f0e3823939af698ea82f6b))
+- As_chunks for the constant-size chunk loops ([d310362](https://github.com/teomurgi/mac-gliff/commit/d310362ee3670de73ee485c9c85c634979d44e32))
+- Keep the glvideo example compiling on Linux ([28577fe](https://github.com/teomurgi/mac-gliff/commit/28577fe5a80c74b654615a220967f750d37a1f76))
+- App icon and a DMG bundle ([a236c73](https://github.com/teomurgi/mac-gliff/commit/a236c7344a8991eb3f144c787bde8df8cda876fb))
+- Fully relocate pixbuf loaders and bake bundle-relative cache ([b8e9adc](https://github.com/teomurgi/mac-gliff/commit/b8e9adc24afacd83b8d4e03eeaad45da7375ba10))
+- Gitignore macOS .DS_Store ([fca70ba](https://github.com/teomurgi/mac-gliff/commit/fca70ba4a823e1939e0dfce6731f6511badf82ca))
+- Local ⌘ shortcuts and a launcher chord for the captured keyboard ([b93cda0](https://github.com/teomurgi/mac-gliff/commit/b93cda0dd9cd213bfe8696f4954c996a83a36a02))
+- MacOS traffic-light window buttons ([ac73eef](https://github.com/teomurgi/mac-gliff/commit/ac73eef520875a4b92b7d2203130e6a9af28eb4a))
+- Pin the Rust toolchain to 1.99.0 ([cc378cd](https://github.com/teomurgi/mac-gliff/commit/cc378cd3239f0b88cf1affaacf8227680bfd682e))
+- Make the workspace macOS-only ([d862d3b](https://github.com/teomurgi/mac-gliff/commit/d862d3b60531c88abcc92eb1ab8f45f63a696cbd))
+- Carry rustfmt and clippy in the pinned toolchain ([9c0456d](https://github.com/teomurgi/mac-gliff/commit/9c0456db129e76cb0568987af67a69cc3d48b903))
 
 
