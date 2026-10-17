@@ -1,6 +1,11 @@
 # Changelog
 
 Derived from [conventional commits](https://www.conventionalcommits.org).
+
+## Unreleased
+
+- **A stalled headless stream heals itself.** A Hyprland reload — an Omarchy theme switch triggers one — could leave the server's capture alive but frameless, freezing the picture until the window was resized by hand. The client now detects a silent stream the user is interacting with and replays that workaround on its own: it nudges the remote output's size by one step and lets the resize path pull it back, kicking the output twice with a growing pause between retries.
+
 ## v0.3.0 (2026-10-17)
 
 Your remote screen, your call. Connecting from a tab or the address bar now asks — mirror the remote display, or open a private headless screen fitted to this window — and a checkbox remembers the choice per machine so it never asks again. Right-click a tab to change the mapping any time (or bring the question back); a running session reconnects under the new mapping on the spot, and `--headless`/`--output` still lock it down outright from the command line ([f69497c](https://github.com/teomurgi/mac-gliff/commit/f69497c5e143d8b5a0e887948028d34f1afa9e28), [#2](https://github.com/teomurgi/mac-gliff/pull/2))

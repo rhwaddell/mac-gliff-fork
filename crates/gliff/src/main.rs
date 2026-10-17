@@ -215,6 +215,17 @@ struct Session {
     resize_requested: Cell<(u32, u32)>,
     /// The output zoom last asked of the decoder; a new worker starts at 1.
     zoom: Cell<u32>,
+    /// When the last decoded frame arrived; `None` until the first one.
+    /// The stall watchdog reads it.
+    last_frame_at: Cell<Option<Instant>>,
+    /// Interactions (key presses, clicks, scrolls) so far, and its value
+    /// when the last frame arrived: the difference is "the user has
+    /// acted, the screen has not answered".
+    input_seq: Cell<u64>,
+    input_seq_at_frame: Cell<u64>,
+    /// Stall-recovery nudges so far, and the earliest the next may run.
+    nudges: Cell<u32>,
+    nudge_after: Cell<Instant>,
     /// The latest frame and its view, painted when the tab is shown.
     #[cfg(target_os = "macos")]
     last_frame: RefCell<Option<(CachedFrame, (u32, u32))>>,
@@ -242,6 +253,11 @@ impl Session {
             stream_scale: Cell::new(1.0),
             resize_requested: Cell::new((0, 0)),
             zoom: Cell::new(1),
+            last_frame_at: Cell::new(None),
+            input_seq: Cell::new(0),
+            input_seq_at_frame: Cell::new(0),
+            nudges: Cell::new(0),
+            nudge_after: Cell::new(Instant::now()),
             last_frame: RefCell::new(None),
             cursor: RefCell::new(None),
             status: RefCell::new(String::new()),
@@ -1478,6 +1494,11 @@ fn poll_frames(ui: Rc<App>, s: Rc<Session>, rx: Receiver<Picture>, generation: u
             // Geometry follows the frame that really paints, so the
             // pointer never maps against a picture that is not on
             // screen (a newer config, or a failed import).
+            // A frame arrived: the stream is live. Record that for the
+            // stall watchdog, and let a fresh episode start over.
+            s.last_frame_at.set(Some(Instant::now()));
+            s.input_seq_at_frame.set(s.input_seq.get());
+            s.nudges.set(0);
             if show_frame(&ui, &s, p.frame, p.view) {
                 s.stream_size.set(p.stream);
                 s.stream_view.set(p.view);
@@ -1794,8 +1815,28 @@ fn to_remote(ui: &App, x: f64, y: f64) -> (f64, f64) {
 
 fn send(ui: &App, msg: ClientMsg) {
     if let Some(s) = active(ui) {
+        if interaction(&msg) {
+            s.input_seq.set(s.input_seq.get() + 1);
+        }
         send_to(&s, msg);
     }
+}
+
+/// Input that should change the remote screen, and so arms the stall
+/// watchdog. Pointer motion is deliberately excluded: the remote cursor
+/// is an overlay, so a still screen the pointer merely crosses stays
+/// legitimately frameless.
+fn interaction(msg: &ClientMsg) -> bool {
+    matches!(
+        msg,
+        ClientMsg::Key { pressed: true, .. }
+            | ClientMsg::PointerButton { pressed: true, .. }
+            | ClientMsg::PointerAxis {
+                discrete: Some(_),
+                stop: false,
+                ..
+            }
+    )
 }
 
 fn send_to(s: &Session, msg: ClientMsg) {
@@ -2591,6 +2632,7 @@ fn install_resize_handler(ui: &Rc<App>) {
         #[cfg(target_os = "macos")]
         ui.gl.set_scale(scale);
         request_zoom(&ui);
+        nudge_stalled_stream(&ui);
         let (w, h) = (ui.video.width() * scale, ui.video.height() * scale);
         let size = (w.max(0) as u32 & !1, h.max(0) as u32 & !1);
         if size != ui.view_size.get() {
@@ -2649,6 +2691,66 @@ fn request_resize(ui: &App) {
         ClientMsg::Resize {
             width: size.0,
             height: size.1,
+            scale: ui.video.scale_factor() as f32,
+        },
+    );
+}
+
+/// How long a headless stream may stay silent while the user interacts
+/// with it before the watchdog steps in.
+const STALL_AFTER: Duration = Duration::from_secs(5);
+
+/// Recover a stalled headless stream on its own. Hyprland's reload — an
+/// Omarchy theme switch triggers one — can leave the server's capture
+/// session alive but frameless: the picture freezes until the output is
+/// reconfigured, which is what resizing the window does by hand. Replay
+/// that here: nudge the output size by the smallest step (a same-size
+/// resize is a no-op server-side) and let the `Connected` handler above
+/// pull it back to the window's size — a second mode change, and a
+/// second kick. Only interaction since the last frame arms it, because
+/// a still screen being read sends no frames by design.
+fn nudge_stalled_stream(ui: &App) {
+    let Some(s) = active(ui) else {
+        return;
+    };
+    if !s.headless.get() || !s.connected.get() {
+        return;
+    }
+    let Some(last_frame) = s.last_frame_at.get() else {
+        return;
+    };
+    let now = Instant::now();
+    if now.duration_since(last_frame) < STALL_AFTER
+        || s.input_seq.get() == s.input_seq_at_frame.get()
+        || now < s.nudge_after.get()
+        // A window resize in flight re-modes the output on its own.
+        || ui.view_size.get() != s.server_view.get()
+    {
+        return;
+    }
+    let attempt = s.nudges.get() + 1;
+    let backoff = STALL_AFTER * (1 << (attempt - 1).min(3));
+    let server = s.server_view.get();
+    // Alternate the step so every retry is a real mode change even when
+    // an earlier nudge is still the server's view.
+    let step = if attempt % 2 == 1 { 2 } else { -2 };
+    let width = ((server.0 as i64 + step).max(64) as u32) & !1;
+    tracing::warn!(
+        attempt,
+        since_ms = now.duration_since(last_frame).as_millis() as u64,
+        width,
+        "headless stream stalled; nudging the output size"
+    );
+    s.nudges.set(attempt);
+    // Require fresh interaction — and a growing pause — before retrying.
+    s.input_seq_at_frame.set(s.input_seq.get());
+    s.nudge_after.set(now + backoff);
+    s.resize_requested.set((width, server.1));
+    send_to(
+        &s,
+        ClientMsg::Resize {
+            width,
+            height: server.1,
             scale: ui.video.scale_factor() as f32,
         },
     );

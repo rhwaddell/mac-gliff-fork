@@ -220,6 +220,17 @@ Every crate with `unsafe` documents the safety requirements at each block.
   `GFileMonitor` on `current/` watches for that child and re-applies after a
   short debounce. With no Omarchy state directory the module does nothing.
 
+- **Stall watchdog.** A Hyprland reload (an Omarchy theme switch triggers one)
+  can leave the server's capture session alive but frameless: the picture
+  freezes until the output is reconfigured, which is what resizing the window
+  does by hand — a same-size `Resize` is a no-op server-side, only a real mode
+  change restarts capture. `nudge_stalled_stream` replays that automatically:
+  when a headless stream the user is interacting with (key presses, clicks,
+  scrolls — motion excluded, a still screen is legitimately frameless) has been
+  silent for 5 s, it sends a `Resize` one step off the server's view; the
+  `Connected` handler then pulls the output back to the window's size, kicking
+  it a second time. Retries need fresh input and back off 5→10→20→40 s.
+
 - **Cursor.** The remote cursor is shown as the video widget's own cursor, so
   the local compositor draws it at the real pointer with no added latency; it is
   never baked into the video. An image with no visible shape falls back to the
