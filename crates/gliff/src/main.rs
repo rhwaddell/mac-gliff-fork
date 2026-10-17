@@ -598,7 +598,16 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
     // closed, then any named on the command line, which is shown first.
     let config = Config::load(&ui.config_path);
     let from_cli = endpoints_from_cli(cli);
+    // Command-line endpoints open first: an explicit --headless or
+    // --output beats the machine's remembered display mode, which the
+    // remembered loop below would otherwise win by opening first.
+    for endpoint in &from_cli {
+        open_session(&ui, endpoint.clone());
+    }
     for machine in &config.open {
+        if find_session(&ui, machine).is_some() {
+            continue;
+        }
         // The machine's last choice, remembered or not; there is no click
         // to ask at.
         let endpoint = match config.display_setting(machine).map(|s| s.mode) {
@@ -606,11 +615,6 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
             None => ssh_endpoint(cli, machine),
         };
         open_session(&ui, endpoint);
-    }
-    for endpoint in from_cli.iter().cloned() {
-        if find_session(&ui, machine_name(&endpoint)).is_none() {
-            open_session(&ui, endpoint);
-        }
     }
     // The address bar showed for the empty tabs; with sessions open it
     // folds into the +.
