@@ -30,6 +30,7 @@ pub fn evdev_code(key: u16) -> Option<u32> {
         0x0F => 19, // R
         0x01 => 31, // S
         0x11 => 20, // T
+        0x20 => 22, // U
         0x2E => 50, // M
         0x09 => 47, // V
         0x0D => 17, // W
@@ -145,6 +146,7 @@ mod tests {
         assert_eq!(evdev_code(0x12), Some(2)); // 1
         assert_eq!(evdev_code(0x1D), Some(11)); // 0
         assert_eq!(evdev_code(0x24), Some(28)); // Return
+        assert_eq!(evdev_code(0x20), Some(22)); // U
         assert_eq!(evdev_code(0x33), Some(14)); // Backspace
         assert_eq!(evdev_code(0x75), Some(111)); // Forward delete
         assert_eq!(evdev_code(0x37), Some(125)); // Command = super
