@@ -10,6 +10,8 @@ mod clipboard_ui;
 #[cfg(target_os = "macos")]
 mod glvideo;
 #[cfg(target_os = "macos")]
+mod cursor;
+#[cfg(target_os = "macos")]
 mod kbd;
 mod keymap;
 mod net;
@@ -153,6 +155,13 @@ struct App {
     /// keyboard stays local until the pointer leaves, or the picture is
     /// clicked.
     released: Cell<bool>,
+    /// The pointer is over the video widget, per the motion controller's
+    /// enter/leave; a headless session hides the local pointer for exactly
+    /// this span.
+    pointer_over_video: Cell<bool>,
+    /// The `NSCursor` hide/unhide balance, so a transition never hides
+    /// twice or unhides the user's own hide.
+    cursor_hidden: Cell<bool>,
     config_path: PathBuf,
     cli: Cli,
     keymap: keymap::Keymap,
@@ -186,6 +195,9 @@ struct Session {
     /// The server is streaming: set by its Connected status, cleared when
     /// the connection drops.
     connected: Cell<bool>,
+    /// The session's output is a private headless one, whose frames carry
+    /// the remote cursor painted in; set by its Connected status.
+    headless: Cell<bool>,
     /// Size of the stream the server is sending, from the last decoded frame.
     stream_size: Cell<(u32, u32)>,
     /// The full-quality fit size the stream is drawn into; equals the stream
@@ -221,6 +233,7 @@ impl Session {
             retries: Cell::new(0),
             gave_up: Cell::new(false),
             remembered: Cell::new(false),
+            headless: Cell::new(false),
             connected: Cell::new(false),
             stream_size: Cell::new((0, 0)),
             stream_view: Cell::new((0, 0)),
@@ -493,6 +506,8 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
         view_size: Cell::new((0, 0)),
         pressed_keys: RefCell::new(BTreeSet::new()),
         released: Cell::new(false),
+        pointer_over_video: Cell::new(false),
+        cursor_hidden: Cell::new(false),
         config_path: Config::default_path(),
         cli: cli.clone(),
         keymap: keymap::watch(),
@@ -1206,6 +1221,8 @@ fn show_session(ui: &Rc<App>, s: &Rc<Session>) {
         }
     }
     ui.video.set_cursor(s.cursor.borrow().as_ref());
+    // Switching between a headless and a mirror session flips the hiding.
+    update_cursor_hidden(ui);
     // A background session kept the size the window had when it was last
     // shown.
     request_resize(ui);
@@ -1224,6 +1241,7 @@ fn show_nothing(ui: &Rc<App>) {
     #[cfg(target_os = "macos")]
     ui.gl.clear();
     ui.video.set_cursor(None);
+    update_cursor_hidden(ui);
     refresh_tabs(ui);
 }
 
@@ -1340,12 +1358,16 @@ fn show_disconnected(ui: &Rc<App>, s: &Rc<Session>) {
     s.stream_view.set((0, 0));
     s.server_view.set((0, 0));
     s.cursor.borrow_mut().take();
+    // The frames carrying the painted-in cursor are gone; the local
+    // pointer shows again until the reconnect says headless once more.
+    s.headless.set(false);
     set_stats(ui, s, "");
     if is_active(ui, s) {
         ui.frame.clear();
         #[cfg(target_os = "macos")]
         ui.gl.clear();
         ui.video.set_cursor(None);
+        update_cursor_hidden(ui);
     }
 }
 
@@ -1524,7 +1546,9 @@ fn poll_status(ui: Rc<App>, s: Rc<Session>, rx: Receiver<Status>, generation: u6
                     view_width,
                     view_height,
                     fps_cap,
+                    headless,
                 } => {
+                    s.headless.set(headless);
                     s.server_view.set((view_width, view_height));
                     s.fps_cap.set(fps_cap);
                     s.resize_requested.set((0, 0));
@@ -1537,6 +1561,10 @@ fn poll_status(ui: Rc<App>, s: Rc<Session>, rx: Receiver<Status>, generation: u6
                     // Visible before the first per-second stats arrive.
                     set_stats(&ui, &s, &video);
                     remember_machine(&ui, &s);
+                    // A headless session paints the remote cursor into its
+                    // frames; hide the local pointer while it is over the
+                    // video, or every frame shows two cursors.
+                    update_cursor_hidden(&ui);
                     // A fresh server starts at its own default size; a
                     // reconnect must bring it back to the window. The gate
                     // compares against the view, so a server-chosen
@@ -1637,14 +1665,47 @@ fn poll_status(ui: Rc<App>, s: Rc<Session>, rx: Receiver<Status>, generation: u6
 /// compositor draws it at the real pointer position with no added latency.
 /// An image with no visible shape (fully transparent, or one flat colour as
 /// Hyprland sends when it has no cursor image to share) falls back to the
-/// default pointer so the user is never left without one.
+/// default pointer so the user is never left without one. Headless sessions
+/// ignore shapes: their frames carry the painted-in cursor and the local
+/// pointer is hidden while it is over the video (see
+/// [`update_cursor_hidden`]), so a widget cursor could only ever be a
+/// second pointer.
 fn set_remote_cursor(ui: &App, s: &Rc<Session>, image: CursorImage) {
+    if s.headless.get() {
+        return;
+    }
     let cursor = remote_cursor(image);
     if is_active(ui, s) {
         ui.video.set_cursor(cursor.as_ref());
     }
     *s.cursor.borrow_mut() = cursor;
 }
+
+/// Hide the local pointer while a headless session's frames already show
+/// the remote cursor, and show it again everywhere else. Hiding goes
+/// through `NSCursor` rather than a transparent widget cursor because
+/// macOS never applies the transparent one (and resets widget cursors to
+/// the arrow while a button is held); the painted-in pointer is then the
+/// only one on screen. Balanced through `cursor_hidden`, so a session or
+/// pointer-state change that resolves to the same state costs nothing.
+#[cfg(target_os = "macos")]
+fn update_cursor_hidden(ui: &App) {
+    let hide = ui.pointer_over_video.get() && active(ui).is_some_and(|s| s.headless.get());
+    if hide == ui.cursor_hidden.get() {
+        return;
+    }
+    ui.cursor_hidden.set(hide);
+    tracing::debug!(hide, "cursor hiding transition");
+    if hide {
+        cursor::hide();
+    } else {
+        cursor::unhide();
+    }
+}
+
+/// No headless sessions off the Mac; nothing to hide.
+#[cfg(not(target_os = "macos"))]
+fn update_cursor_hidden(_ui: &App) {}
 
 struct CursorImage<'a> {
     width: u32,
@@ -2270,6 +2331,8 @@ fn install_input_handlers(
         let ui = ui.clone();
         let video = video.clone();
         motion.connect_enter(move |_, _, _| {
+            ui.pointer_over_video.set(true);
+            update_cursor_hidden(&ui);
             if active(&ui).is_some()
                 && !ui.released.get()
                 && !address_bar_in_use(&ui.window, &ui.entry)
@@ -2282,6 +2345,8 @@ fn install_input_handlers(
         let ui = ui.clone();
         let window = window.clone();
         motion.connect_leave(move |_| {
+            ui.pointer_over_video.set(false);
+            update_cursor_hidden(&ui);
             // A deliberate release lasts only as long as the pointer rests on
             // the picture; leaving and coming back captures again.
             ui.released.set(false);
