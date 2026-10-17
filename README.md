@@ -16,6 +16,23 @@ Metal**. The server is untouched — it stays on the Linux machine.
 <img src=".github/assets/screenshot.jpg" width="880" alt="A Hyprland desktop streamed to the Mac by mac-gliff">
 </div>
 
+## Highlights
+
+**Your Omarchy machine is one `ssh` away — at full quality.**
+
+- **SSH is all it takes.** No open ports, no accounts, no relay, no VPN. If you can
+  `ssh` to the box, you can sit at it: video, input and clipboard all ride that one
+  pipe, and only coded H.264 crosses the network.
+- **The screen fits your window.** Mirror the remote display 1:1, or get a private
+  headless screen that resizes live as you resize the Mac window. Your call per
+  machine — remember the choice, or switch it mid-session from the tab menu.
+- **Copy here, paste there.** A real clipboard, both directions: text, images and
+  whole files, streamed in chunks with progress and a cancel button — a big paste
+  never stalls the video.
+- **Text you can read.** Full 4:4:4 colour via AVC444 — two H.264 streams split and
+  recombined losslessly — decoded on VideoToolbox, displayed zero-copy through Metal.
+  Syntax highlighting, diffs and terminals arrive crisp, not smeared.
+
 ## Why
 
 Most remote desktops send video with halved colour resolution (4:2:0), which is why
