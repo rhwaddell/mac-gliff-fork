@@ -88,10 +88,7 @@ impl Player {
         Ok(match format {
             cpal::SampleFormat::F32 => device.build_output_stream::<f32, _, _>(
                 config,
-                move |out, _| match source.lock() {
-                    Ok(mut j) => j.render(out, channels),
-                    Err(_) => out.fill(0.0),
-                },
+                move |out, _| render_nonblocking(&source, out, channels),
                 on_error,
                 None,
             )?,
@@ -101,10 +98,7 @@ impl Player {
                     config,
                     move |out, _| {
                         scratch.resize(out.len(), 0.0);
-                        match source.lock() {
-                            Ok(mut j) => j.render(&mut scratch, channels),
-                            Err(_) => scratch.fill(0.0),
-                        }
+                        render_nonblocking(&source, &mut scratch, channels);
                         for (o, s) in out.iter_mut().zip(&scratch) {
                             *o = (s.clamp(-1.0, 1.0) * i16::MAX as f32) as i16;
                         }
@@ -119,10 +113,7 @@ impl Player {
                     config,
                     move |out, _| {
                         scratch.resize(out.len(), 0.0);
-                        match source.lock() {
-                            Ok(mut j) => j.render(&mut scratch, channels),
-                            Err(_) => scratch.fill(0.0),
-                        }
+                        render_nonblocking(&source, &mut scratch, channels);
                         for (o, s) in out.iter_mut().zip(&scratch) {
                             *o = (s.clamp(-1.0, 1.0) * i32::MAX as f32) as i32;
                         }
@@ -271,6 +262,15 @@ impl Sink {
     }
 }
 
+/// Audio callbacks must never wait for the network thread or stats reader.
+/// If the jitter buffer is busy, emit silence for this device block instead.
+fn render_nonblocking(source: &Mutex<Jitter>, out: &mut [f32], channels: usize) {
+    match source.try_lock() {
+        Ok(mut jitter) => jitter.render(out, channels),
+        Err(_) => out.fill(0.0),
+    }
+}
+
 fn note_output_error(failed: &AtomicBool, error: &cpal::Error) {
     // CPAL reports recoverable xruns too. They do not mean the device is
     // gone and must not tear down the stream and its jitter buffer.
@@ -329,6 +329,22 @@ fn open_in_background<T: Send + 'static>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn callback_returns_silence_when_the_buffer_is_busy() {
+        let source = Mutex::new(Jitter::new(crate::SAMPLE_RATE));
+        let held = source.lock().unwrap();
+        let mut out = [1.0; 16];
+        render_nonblocking(&source, &mut out, 2);
+        assert_eq!(out, [0.0; 16]);
+        drop(held);
+        {
+            let mut jitter = source.lock().unwrap();
+            jitter.push(&vec![0.5; 4_808 * 2]);
+        }
+        render_nonblocking(&source, &mut out, 2);
+        assert!(out.iter().any(|sample| *sample != 0.0));
+    }
 
     #[test]
     fn an_xrun_does_not_reopen_the_output_but_a_lost_device_does() {

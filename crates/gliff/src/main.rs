@@ -167,6 +167,7 @@ struct App {
     pointer_over_video: Cell<bool>,
     /// The `NSCursor` hide/unhide balance, so a transition never hides
     /// twice or unhides the user's own hide.
+    #[cfg(target_os = "macos")]
     cursor_hidden: Cell<bool>,
     config_path: PathBuf,
     cli: Cli,
@@ -248,6 +249,7 @@ impl Session {
             stream_scale: Cell::new(1.0),
             resize_requested: Cell::new((0, 0)),
             zoom: Cell::new(1),
+            #[cfg(target_os = "macos")]
             last_frame: RefCell::new(None),
             cursor: RefCell::new(None),
             status: RefCell::new(String::new()),
@@ -346,6 +348,9 @@ windowcontrols > button:hover > image,
 windowcontrols > button:active > image { color: rgba(0, 0, 0, 0.55); }
 windowcontrols > button:backdrop > image { background-color: alpha(currentColor, 0.3); }
 "#;
+/// Other platforms use their native window controls.
+#[cfg(not(target_os = "macos"))]
+const WINDOW_CONTROLS_CSS: &str = "";
 
 /// The one window: a header with a tab per machine and the address bar, the
 /// remote screen (black until connected) with any status over it.
@@ -471,6 +476,10 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
         {
             tier_stack.clone().upcast()
         }
+        #[cfg(not(target_os = "macos"))]
+        {
+            picture.clone().upcast()
+        }
     };
 
     let transfers = Rc::new(clipboard_ui::TransferBars::new());
@@ -519,6 +528,7 @@ fn build_ui(app: &adw::Application, cli: &Cli) {
         pressed_keys: RefCell::new(BTreeSet::new()),
         released: Cell::new(false),
         pointer_over_video: Cell::new(false),
+        #[cfg(target_os = "macos")]
         cursor_hidden: Cell::new(false),
         config_path: Config::default_path(),
         cli: cli.clone(),
@@ -1289,6 +1299,7 @@ fn stop_session(ui: &Rc<App>, name: &str) {
     // dropping the sender closes the worker's input, which ends it.
     s.generation.set(s.generation.get() + 1);
     s.input_tx.borrow_mut().take();
+    #[cfg(target_os = "macos")]
     s.last_frame.borrow_mut().take();
     // A machine stopped by hand stays stopped when the window reopens.
     if matches!(s.endpoint, Endpoint::Ssh(_)) {
@@ -1426,6 +1437,7 @@ fn show_disconnected(ui: &Rc<App>, s: &Rc<Session>) {
     if is_active(ui, s) {
         clipboard_ui::drop_remote_offer();
     }
+    #[cfg(target_os = "macos")]
     s.last_frame.borrow_mut().take();
     s.stream_size.set((0, 0));
     s.stream_view.set((0, 0));
@@ -1570,8 +1582,10 @@ fn show_frame(ui: &Rc<App>, s: &Rc<Session>, frame: Frame, view: (u32, u32)) -> 
                 ui.tier_stack.set_visible_child_name("texture");
             }
             #[cfg(target_os = "macos")]
-            let cached = CachedFrame::Texture(texture.clone());
-            *s.last_frame.borrow_mut() = Some((cached, view));
+            {
+                let cached = CachedFrame::Texture(texture.clone());
+                *s.last_frame.borrow_mut() = Some((cached, view));
+            }
             true
         }
         Err(e) => {
@@ -2351,6 +2365,8 @@ fn install_input_handlers(
             // super never leaks into an ordinary chord.
             #[cfg(target_os = "macos")]
             let chord = launcher.matches_physical(keycode as u16, state, &launcher_tap);
+            #[cfg(not(target_os = "macos"))]
+            let chord = launcher.matches(keyval, state, &launcher_tap);
             if launcher_armed.get() && !chord {
                 finish_launcher(&ui, &launcher, &launcher_armed, state);
             }
@@ -2366,6 +2382,8 @@ fn install_input_handlers(
             let Some(code) = kbd::evdev_code(keycode as u16) else {
                 return glib::Propagation::Stop;
             };
+            #[cfg(not(target_os = "macos"))]
+            let code = keycode.saturating_sub(8);
             tracing::debug!(keycode, code, "key pressed");
             forward_key(&ui, code, true);
             glib::Propagation::Stop
@@ -2378,6 +2396,8 @@ fn install_input_handlers(
         key.connect_key_released(move |_, _keyval, keycode, state| {
             #[cfg(target_os = "macos")]
             let chord_key = launcher.evdev() == kbd::evdev_code(keycode as u16);
+            #[cfg(not(target_os = "macos"))]
+            let chord_key = Some(_keyval) == launcher.keyval();
             if launcher_armed.get() && chord_key {
                 finish_launcher(&ui, &launcher, &launcher_armed, state);
                 return;
@@ -2386,6 +2406,8 @@ fn install_input_handlers(
             let Some(code) = kbd::evdev_code(keycode as u16) else {
                 return;
             };
+            #[cfg(not(target_os = "macos"))]
+            let code = keycode.saturating_sub(8);
             tracing::debug!(keycode, code, "key released");
             forward_key(&ui, code, false);
         });

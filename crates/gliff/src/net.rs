@@ -7,6 +7,7 @@
 
 use std::rc::Rc;
 use std::sync::mpsc::{Sender as StdSender, SyncSender};
+#[cfg(target_os = "macos")]
 use std::sync::Arc;
 
 use anyhow::Context;
@@ -229,6 +230,27 @@ fn open_gpu(mode: VideoMode) -> Option<Arc<Gpu>> {
             None
         }
     }
+}
+
+#[cfg(not(target_os = "macos"))]
+fn open_gpu(mode: VideoMode) -> Option<()> {
+    if mode != VideoMode::Cpu {
+        tracing::info!(
+            "GPU video decoding is unavailable on this platform; using the CPU pipeline"
+        );
+    }
+    None
+}
+
+#[cfg(not(target_os = "macos"))]
+fn new_decoder(
+    _gpu: &Option<()>,
+    chroma: ChromaMode,
+    _width: u32,
+    _height: u32,
+) -> anyhow::Result<VideoDecoder> {
+    let dual = chroma != ChromaMode::Single420;
+    Ok(VideoDecoder::Cpu(Box::new(gliff_sw::Decoder::new(dual)?)))
 }
 
 #[cfg(target_os = "macos")]
